@@ -1,5 +1,8 @@
 # Kovan Ağırlık Değişimi Tahmini — Eğitim Öncesi Hipotez ve Endüktif Yanlılık Raporu
 
+**Öğrenci:** Sarkan MAMMADOV  
+**Ders:** BM 618 - Derin Öğrenme ve Büyük Dil Modelleri  
+**Öğretim Üyesi:** Dr. Öğr. Üyesi Ahmet ALBAYRAK  
 **Tarih:** 16 Ekim 2026  
 **Problem:** Kovan telemetri sensörleri ($w_t, T_{\text{in}}, H_{\text{in}}$) ve saatlik dış meteoroloji verileri ($T_{\text{out}}, H_{\text{out}}, P_{\text{out}}, V_{\text{wind}}$) kullanılarak sonraki 24 saatteki kovan ağırlığı değişiminin ($\Delta \text{weight}_{t+24} \in \mathbb{R}$, nektar akışı) kestirimi.  
 **Karşılaştırılan Mimariler:** Causal Dilated Residual CNN (TCN), Long Short-Term Memory (LSTM), Causal Masked Transformer.

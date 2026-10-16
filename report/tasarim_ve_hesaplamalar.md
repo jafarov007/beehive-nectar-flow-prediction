@@ -1,5 +1,9 @@
 # Mimari Tasarım Spesifikasyonu: Receptive Field Türetimi, Analitik Parametre ve MAC Hesaplamaları
 
+**Öğrenci:** Sarkan MAMMADOV  
+**Ders:** BM 618 - Derin Öğrenme ve Büyük Dil Modelleri  
+**Öğretim Üyesi:** Dr. Öğr. Üyesi Ahmet ALBAYRAK  
+
 > **Doğrulama Notu:** Bu rapordaki tüm parametre ve MAC sayıları **önce analitik matematiksel formüllerle elle türetilmiş**, ardından PyTorch tensör kancaları (`forward hook`) ve tensör boyutları üzerinden çalışan test betiğiyle (`python src/models.py`) **birebir doğrulanmıştır**. Kod çıktısı analitik hesaplamalarla %100 tam eşleşmektedir.
 
 ---

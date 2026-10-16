@@ -1,9 +1,11 @@
 # Kovan Ağırlık Değişimi Tahmini (Nektar Akışı) — Nihai Deney ve Karşılaştırma Raporu
 
-**Öğrenci:** Serxan M.  
-**Ders:** Derin Öğrenme / Zaman Serileri Analizi  
+**Öğrenci:** Sarkan MAMMADOV  
+**Ders:** BM 618 - Derin Öğrenme ve Büyük Dil Modelleri  
+**Öğretim Üyesi:** Dr. Öğr. Üyesi Ahmet ALBAYRAK  
+**Bölüm:** Bilgisayar Mühendisliği / Mühendislik Fakültesi  
 **Veri:** Kaggle "Beehive Metrics" (Würzburg ana kaynak kovanı, Bad Schwartau transfer kovanı) + Open-Meteo Saatlik Dış Hava Verisi  
-**Kod ve Deney Reposu:** `C:\Users\serxan.m\Desktop\kovan_project`
+**Kod ve Deney Reposu:** [https://github.com/sarkannnn/beehive-nectar-flow-prediction](https://github.com/sarkannnn/beehive-nectar-flow-prediction)
 
 ---
 
