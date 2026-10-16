@@ -79,7 +79,7 @@ $$\text{Causal CNN} \ge \text{LSTM} > \text{Causal Transformer}$$
 
 ## 4. Karşılaştırma (5 Seed, Eşit Bütçe, %95 Güven Aralığı)
 
-Ödev şartı gereği karşılaştırmanın tam anlamıyla adil ve izo-koşullarda olması için tüm modellerde **aynı eğitim ve tuning bütçesi protokolü** katı şekilde uygulanmıştır:
+Deneysel karşılaştırmanın tam anlamıyla adil, tarafsız ve izo-hesaplama koşullarında yürütülmesi amacıyla tüm modellerde **aynı eğitim ve hiperparametre optimizasyon protokolü** katı şekilde uygulanmıştır:
 * **Tuning Bütçesi:** Her üç model için de aynı rastgele tohumdan (`seed=1234`) türetilen 6 hiperparametre adayı (learning rate, dropout, weight decay), deneme başına maksimum 10 epoch ve $patience=5$ erken durdurma ile yalnızca Doğrulama (Val) kümesi üzerinde değerlendirilmiştir.
 * **Final Eğitim Bütçesi ve Hiperparametre Eşitliği:** Seçilen en iyi hiperparametrelerle her model 5 bağımsız tohumda (`seed=0, 1, 2, 3, 4`) sıfırdan eğitilmiştir. Her üç model için:
   * **Maksimum Epoch Sınırı:** 25 epoch (tüm modeller için sabit üst sınır).

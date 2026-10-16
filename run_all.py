@@ -40,8 +40,8 @@ def sync_to_desktop():
 
 def main():
     print("=" * 60)
-    print("KOVON AGIRLIK DEGISIMI TAHMINI - MASTER CALISTIRICI")
-    print("Ahmet Hoca Odev Tam Pipeline (Asama 0 - 8)")
+    print("BEEHIVE NECTAR FLOW PREDICTION - BENCHMARK PIPELINE")
+    print("Stages 0 - 8: Preprocessing, Iso-Param Training, Analysis & Reporting")
     print("=" * 60)
     
     # 1. Veri Hazirligi (Asama 1)
