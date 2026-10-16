@@ -136,7 +136,6 @@ Transferring models pre-trained on Würzburg ($12\text{h}$ resampled grid) to th
 │   ├── summarize.py              # Statistical aggregations, Welch tests, and automated figure generation
 │   └── weather.py                # Open-Meteo API automated weather collector
 ├── report/
-│   ├── Kovan_Rapor_Final.docx    # Complete final formatted academic submission report (.docx)
 │   ├── sonuc_ve_rapor.md         # Full markdown academic technical report
 │   ├── hipotez.md                # Formal pre-training inductive bias hypothesis document
 │   └── tasarim_ve_hesaplamalar.md# Detailed mathematical derivations of RF, Params, and MACs

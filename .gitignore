@@ -16,7 +16,9 @@ ENV/
 .idea/
 *.swp
 
-# Temporary data/caches
+# Temporary data/caches & Office binaries
 *.tmp
 ~$*
+*.docx
+*.doc
 inspect_duzeltilmis.txt
