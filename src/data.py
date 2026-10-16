@@ -14,7 +14,22 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from weather import fetch_weather  # noqa: E402
 
-ARCHIVE = "C:/Users/serxan.m/Desktop/archive/"
+ROOT_DATA = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+ARCHIVE_CANDIDATES = [
+    os.environ.get("ARCHIVE_DIR"),
+    os.path.join(ROOT_DATA, "archive"),
+    ROOT_DATA,
+    "archive",
+    "../archive",
+]
+
+def _find_archive():
+    for p in ARCHIVE_CANDIDATES:
+        if p and os.path.isdir(p):
+            return p if p.endswith(("/", "\\")) else p + "/"
+    return "data/"
+
+ARCHIVE = _find_archive()
 FEATURES = ["dw", "t_in", "h_in", "t_out", "h_out", "precip", "wind", "hour_sin", "hour_cos"]
 N_FEATURES = len(FEATURES)
 
@@ -98,6 +113,13 @@ def build_hourly(name="wurzburg"):
     key = ("h", name)
     if key in _CACHE:
         return _CACHE[key]
+    proc_csv = os.path.join(ROOT_DATA, f"processed_hourly_{name}.csv")
+    if os.path.exists(proc_csv):
+        df = pd.read_csv(proc_csv, parse_dates=[0], index_col=0)
+        df.index = pd.to_datetime(df.index)
+        nev = 0
+        _CACHE[key] = (df, nev)
+        return df, nev
     w = _clean(_series(name, "weight"), "weight").resample("1h").last()
     t = _clean(_series(name, "temperature"), "temperature").resample("1h").mean()
     h = _clean(_series(name, "humidity"), "humidity").resample("1h").mean()
@@ -133,6 +155,13 @@ def build_12h(name):
     key = ("12", name)
     if key in _CACHE:
         return _CACHE[key]
+    proc_csv = os.path.join(ROOT_DATA, f"processed_12h_{name}.csv")
+    if os.path.exists(proc_csv):
+        df = pd.read_csv(proc_csv, parse_dates=[0], index_col=0)
+        df.index = pd.to_datetime(df.index)
+        nev = 0
+        _CACHE[key] = (df, nev)
+        return df, nev
     if name == "wurzburg":
         h, _ = build_hourly("wurzburg")
         hv = h[h["seg"] >= 0]

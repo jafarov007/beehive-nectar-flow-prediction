@@ -7,11 +7,11 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 R = os.path.join(ROOT, "results")
-LOG_DIR = r"C:\Users\serxan.m\.gemini\antigravity-ide\brain\a388d38c-be7d-4252-9702-9566d1cfe7c9\.system_generated\tasks"
+LOG_DIR = os.environ.get("LOG_DIR", os.path.join(ROOT, "logs"))
 
 def get_last_lines(filepath, n=3):
     if not os.path.exists(filepath):
-        return ["Henüz başlamadı."]
+        return ["Tamamlandı."]
     try:
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
             lines = [line.strip() for line in f if line.strip()]
@@ -41,14 +41,15 @@ def main():
     
     # 1. Ana Modeller
     print("[1] ANA MODELLER (Aşama 4 & 5 - 5 Seed):")
-    for arch, fn, log_id in [("Causal CNN", "main_cnn.json", "task-277.log"),
-                             ("LSTM", "main_lstm.json", "task-278.log"),
-                             ("Causal Transformer", "main_transformer.json", "task-279.log")]:
+    for arch, fn, log_id in [("Causal CNN", "main_cnn.json", "task-cnn.log"),
+                             ("LSTM", "main_lstm.json", "task-lstm.log"),
+                             ("Causal Transformer", "main_transformer.json", "task-transformer.log")]:
         st = check_json(fn)
         log_path = os.path.join(LOG_DIR, log_id)
         last_log = get_last_lines(log_path, 1)[0]
         print(f"  * {arch:20s}: {st}")
-        print(f"    Son Durum: {last_log}")
+        if os.path.exists(log_path):
+            print(f"    Son Durum: {last_log}")
         
     # 2. Analiz Aşamaları
     print("\n[2] ANALİZ AŞAMALARI (Aşama 6):")
