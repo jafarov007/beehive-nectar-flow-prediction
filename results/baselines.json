@@ -1,0 +1,8 @@
+{
+ "mean_pred_mae": 0.2622151644448143,
+ "zero_pred_mae": 0.2645378543899476,
+ "persistence_mae": 0.2617187688084051,
+ "persistence_rmse": 0.5037775769097221,
+ "mean_pred_rmse": 0.45520648807975067,
+ "n_test": 1457
+}
