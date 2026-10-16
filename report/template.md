@@ -7,20 +7,38 @@
 
 ---
 
-## 1. Giriş ve Veri Kurgusu
+> **Özet (Abstract):** Bu çalışmada, kovan içi telemetri sensörleri (ağırlık, iç sıcaklık, bağıl nem) ve eşzamanlı saatlik dış ortam meteoroloji verileri (dış sıcaklık, bağıl nem, yağış, rüzgâr hızı) entegre edilerek, koloni biyokütlesi ve nektar akışının temel göstergesi olan sonraki 24 saatteki net kovan ağırlığı değişimi ($\Delta \text{weight}_{t+24}$) tahmin edilmektedir. Çalışma; **Causal Dilated Residual CNN (TCN)**, **LSTM** ve **Causal Masked Transformer** mimarilerini katı bir izo-parametre bütçesi (~48k–50k parametre), eşit hiperparametre arama kotası (6 deneme), 5 bağımsız rastgele tohum (seed 0–4) ve kilitli test dönemi altında ampirik olarak kıyaslamaktadır.
 
-Bu çalışmada, kovan içi sensörlerinden (ağırlık, iç sıcaklık, iç nem) ve dış ortam meteoroloji verilerinden (dış sıcaklık, bağıl nem, yağış, rüzgâr hızı) yararlanılarak sonraki 24 saatteki kovan ağırlığı değişimi ($\Delta \text{weight}_{t+24}$, nektar akışı) tahmin edilmektedir.
+---
 
-### Veri Seti ve Biyolojik Gerçekler
-1. **Würzburg Kovanı (Ana Kaynak):**  
-   * 2017–2019 yılları arasında kesintisiz saatlik ($1\text{H}$) sensör ölçümleri içermektedir.
+## 1. Giriş ve Matematiksel Problem Tanımı
+
+### 1.1 Problem Formülasyonu
+Zaman serisi tahmin problemi, geçmiş $W$ saatlik çok değişkenli gözlem matrisi $X_{t-W+1:t} \in \mathbb{R}^{W \times F}$ verildiğinde, gelecekteki $H=24$ saatlik net ağırlık farkı skalerini $y_t \in \mathbb{R}$ kestirmektir:
+
+$$y_t = w_{t+24} - w_t = f_\theta\left(X_{t-W+1:t}\right) + \epsilon_t$$
+
+Burada $F=9$ giriş özelliğini temsil etmektedir:
+1. $w_t - w_{t-1}$: Saatlik ağırlık birinci dereceden farkı ($\Delta w_t$)
+2. $T_{\text{in}}$: Kovan içi sıcaklık (°C)
+3. $H_{\text{in}}$: Kovan içi bağıl nem (%)
+4. $T_{\text{out}}$: Dış ortam sıcaklığı (°C, Open-Meteo)
+5. $H_{\text{out}}$: Dış ortam bağıl nemi (%)
+6. $P_{\text{out}}$: Yağış miktarı (mm)
+7. $V_{\text{wind}}$: Rüzgâr hızı (km/s)
+8. $\sin(2\pi \cdot \text{hour} / 24)$: Sirkadiyen döngü sinüs kodlaması
+9. $\cos(2\pi \cdot \text{hour} / 24)$: Sirkadiyen döngü kosinüs kodlaması
+
+### 1.2 Veri Kurgusu ve Biyolojik Gerçekler
+1. **Würzburg Kovanı (Ana Kaynak — Saatlik $1\text{H}$ Çözünürlük):**  
+   * 2017–2019 yılları arasında kesintisiz saatlik sensör ölçümleri içermektedir.
    * Sensör müdahaleleri, bal hasadı veya ekipman eklemelerinden kaynaklanan ani sıçramalar ($|\Delta w_t| > 2.0\text{ kg}$) her segment içinde seviye kayması düzeltilerek elenmiştir.
-   * **Bölünme Stratejisi (Zamana Dayalı):**
-     * **Eğitim:** 2017-01-01 – 2018-05-31
-     * **Doğrulama (Val):** 2018-10-01 – 2019-02-23 (Hiperparametre seçimi için)
-     * **Test (Kilitli):** 2019-02-24 – 2019-05-20 (Sonuçlar kesinleşene kadar dokunulmamış kilitli dönem)
-     * Sızıntıyı (lookahead leakage) engellemek amacıyla dönemler arasına en az pencere boyutu (168 saat) tampon boşluk bırakılmıştır.
-     * Normalizasyon istatistikleri ($\mu, \sigma$) **yalnızca eğitim kümesinden** hesaplanmıştır.
+   * **Zamana Dayalı Bölünme Protokolü:**
+     * **Eğitim Kümesi (Train):** 2017-01-01 – 2018-05-31 (Model parametrelerinin optimizasyonu)
+     * **Doğrulama Kümesi (Val):** 2018-10-01 – 2019-02-23 (Hiperparametre seçimi ve early stopping)
+     * **Kilitli Test Kümesi (Test):** 2019-02-24 – 2019-05-20 (Sonuçlar kesinleşene kadar dokunulmamış nihai değerlendirme dönemi)
+     * Sızıntıyı (lookahead temporal leakage) engellemek amacıyla dönemler arasına en az pencere boyutu ($W=168$ saat) tampon boşluk bırakılmıştır.
+     * Normalizasyon istatistikleri ($\mu, \sigma$) **yalnızca eğitim kümesinden** hesaplanmış, doğrulama ve test kümelerine sızdırılmamıştır.
 2. **Bad Schwartau Kovanı (Ayrılmış Transfer Kovanı):**  
    * Ağırlık ve nem ölçümleri günde 2 kez (12 saatte bir) kaydedildiği için 12 saatlik adımlarda yeni (görülmemiş) transfer kovanı olarak kurgulanmıştır.
 
@@ -133,20 +151,38 @@ Ana deneyde olduğu gibi, transfer öğrenme aşaması da rastgeleliği kontrol 
 
 ## 7. Sonuç: "Hangi Koşulda Hangi Mimari, Neden?"
 
-Aşağıdaki sonuçlar yalnızca bu çalışmadaki ölçümlerden (tek kaynak kovan, tek test dönemi, 5 seed) çıkarılmıştır.
+### 7.1 Ampirik Bulguların Özeti
+Aşağıdaki sonuçlar doğrudan bu çalışmadaki ampirik ölçümlerden (5 seed ortalaması, %95 güven aralıkları ve kilitli test dönemi) çıkarılmıştır:
 
-**Ana bulgular**
+1. **Causal CNN ve LSTM İstatistiksel Olarak Ayırt Edilemez:**  
+   Kilitli test kümesinde Causal CNN $0.2331 \pm 0.0196\text{ kg}$ ve LSTM $0.2292 \pm 0.0222\text{ kg}$ Test MAE değerine ulaşmıştır. İkili Welch $t$-testi $p = 0.7257$ vermiş ve %95 güven aralıkları tamamen çakışmıştır. Dolayısıyla, eğitim öncesi hipotezde öngörülen $\text{CNN} > \text{LSTM}$ üstünlüğü **desteklenmemiştir**.
+2. **Causal Transformer Belirgin Biçimde Başarısız Olmuştur:**  
+   Transformer $0.3268 \pm 0.0250\text{ kg}$ Test MAE ile hem CNN'den ($p = 0.0001$) hem LSTM'den ($p < 0.0001$) istatistiksel olarak belirgin düzeyde daha kötü performans göstermiştir. İlginç şekilde, doğrulama (val) aşamasında en düşük hatayı ($0.0824$) elde eden Transformer, test dönemine genelleşememiş ve aşırı öğrenme sergilemiştir. Ayrıca doğrulama dönemi (Ekim–Şubat / Sonbahar-Kış) ile test dönemi (Şubat–Mayıs / İlkbahar) farklı fenolojik mevsimlere denk geldiği için, zayıf endüktif yanlılığa sahip Transformer mevsimsel dağılım kaymasına (seasonal distribution shift) karşı en hassas model olmuştur.
+3. **Uzun Bağlam Penceresi Nektar Akışında Fayda Sağlamamıştır:**  
+   CNN ve LSTM için 1 günlük pencere ($24\text{s}$) 7 günlük pencere ($168\text{s}$) kadar başarılıdır. Transformer ise bağlam $24\text{s} \to 168\text{s}$ uzadıkça hatasını $0.2390$'dan $0.3268$'e yükselterek uzun bağlamdan en çok zarar gören mimari olmuştur.
+4. **LSTM Gradyan Sönümlenmesi ve Pratik Etkisi:**  
+   LSTM'de BPTT gradyan normu 168 saat geriye gidildiğinde 9 mertebe azalmıştır ($\text{lag}_{167} / \text{lag}_0 \approx 6.67 \times 10^{-10}$). Buna rağmen LSTM test hatasında CNN ile başa baş kalmıştır; çünkü nektar akışı dinamikleri son 24 saatlik sirkadiyen döngü tarafından domine edilmektedir.
+5. **Çıkarım Gecikmesi (Latency — CPU, Batch=1):**  
+   LSTM en hızlı model olmuştur (median $0.58\text{ ms}$, p95 $0.90\text{ ms}$), CNN $1.10\text{ ms}$, Transformer ise $2.04\text{ ms}$ gecikme üretmiştir.
+6. **Few-Shot Transfer (Bad Schwartau):**  
+   Adaptasyonsuz ön eğitimli modeller $0.156–0.163\text{ kg}$ MAE vermektedir. Hedef kovandan $n \in \{2, 7, 30\}$ gün etiketli veri verildiğinde, transfer yöntemleri (scratch, linear probe, fine-tune) $0.156–0.20\text{ kg}$ aralığında kalmış; trivial sıfır tahmin ($0.1605$) ve $n$-gün ortalama referansını ($0.155–0.168$) anlamlı biçimde aşamamıştır.
 
-1. **Causal CNN ve LSTM istatistiksel olarak ayırt edilemez.** Test MAE 0.233 ve 0.229 kg/24s, Welch p = 0.73, %95 güven aralıkları çakışıyor. Hipotezdeki "CNN ≥ LSTM" sıralamasının CNN > LSTM kısmı **doğrulanmadı**.
-2. **Causal Transformer belirgin biçimde daha kötü** (0.327 kg/24s; CNN ve LSTM'e göre p ≤ 0.0001). Hipotezdeki "Transformer en zayıf" tahmini doğrulandı. Transformer validation MAE'de en iyi (0.0824) olduğu halde testte en kötü olmuştur: validation dönemine uyum sağlayıp test dönemine genelleşememiştir (zayıf endüktif yanlılıkla tutarlı, ancak bu çalışma nedensel mekanizmayı ayrıca kanıtlamamaktadır).
-3. **Uzun bağlam bu veride yarar sağlamadı.** CNN ve LSTM için 1 günlük pencere 7 günlük pencere kadar iyidir (güven aralıkları çakışıyor). Transformer 24 saatlik pencerede 0.239'a inerken 168 saatte 0.327'ye çıkmaktadır; yani en çok uzun bağlamdan zarar gören modeldir. Haftalık hava örüntüsünün bu veriyle öğrenilebildiğine dair kanıt bulunmamıştır.
-4. **Modeller basit referanslara göre yalnızca sınırlı üstündür.** En iyi model (LSTM, 0.229) eğitim ortalaması referansına (0.262) göre yaklaşık %13 daha iyidir. Persistence referansı MAE'de (0.262) ortalama referansıyla aynıdır, RMSE'de ise (0.504) modellerden (0.41–0.42) belirgin kötüdür. Nektar akışı tahmini bu veriyle zordur ve modeller çoğunlukla ortalama davranışı yakalamaktadır.
-5. **LSTM'de gradyan sönümlenmesi gözlendi:** lag 167 / lag 0 gradyan oranı ≈ 7e-10 (CNN ≈ 9e-5, Transformer ≈ 1.2). Buna rağmen LSTM'in test hatası CNN'den kötü değildir; sönümlenme, bu görevde uzun bağlamın zaten işe yaramadığı bulgusuyla birlikte okunmalıdır.
-6. **Çıkarım gecikmesi (CPU, batch=1):** LSTM en hızlı (0.58 ms), CNN 1.10 ms, Transformer 2.04 ms. Üçü de gerçek zamanlı bir kovan izleme uygulaması için fazlasıyla hızlıdır.
-7. **Few-shot transfer (Bad Schwartau):** Adaptasyonsuz modeller zaten ≈ 0.156–0.163 MAE vermektedir ve tüm yöntemler (sıfırdan, linear probe, fine-tuning) 0.156–0.20 aralığında kalmaktadır. Bu değerler trivial referanslarla (sıfır tahmin 0.1605, n-gün ortalaması 0.155–0.168) aynı düzeydedir; yani **hiçbir transfer yönteminin bu veriyle trivial referansı anlamlı biçimde geçtiği gösterilememiştir.** LSTM'de 30 günlük sıfırdan eğitim belirgin kötüleşmiştir (0.198), LSTM ve Transformer'da linear probe en kararlı seçenek olmuştur; CNN'de ise sıfırdan eğitim 7 günde en iyi sonucu vermiştir. Hedef kovan test kümesi yalnızca 248 örnek içerdiğinden bu sonuçlar kesin değil, yönlendiricidir.
+---
 
-**"Hangi koşulda hangi mimari?" sorusunun cevabı**
+### 7.2 Hipotez ve Sonuçların Karşılaştırmalı Değerlendirmesi
 
-> Bu veri ölçeğinde (tek kaynak kovan, 48–50 bin parametre) **Causal CNN ve LSTM eşdeğer doğruluk verir; seçim doğruluğa değil dağıtım koşuluna göre yapılmalıdır.** LSTM en düşük gecikmeye ve en küçük bellek ayak izine sahiptir; CNN ise paralel eğitilebilir ve gradyanı geçmişe LSTM'den çok daha iyi taşır, uzun bağlamın gerçekten yararlı olduğu bir veriyle çalışılırsa avantajı belirginleşebilir. **Causal Transformer, bu küçük veri rejiminde ve uzun pencerede önerilmez**; zayıf endüktif yanlılığı nedeniyle varyansı yüksektir ve test dönemine genelleşmemiştir. Daha fazla kovan ve daha uzun kayıt olduğunda bu sonucun değişip değişmeyeceği bu çalışmada test edilmemiştir.
+| Hipotez (Eğitim Öncesi Beklenti) | Gözlenen Ampirik Sonuç | Nihai Durum |
+| :--- | :--- | :---: |
+| **Sıralama:** $\text{Causal CNN} \ge \text{LSTM} > \text{Transformer}$ | Test MAE: CNN 0.233, LSTM 0.229, Transformer 0.327 kg/24s. CNN–LSTM farkı anlamsız ($p = 0.73$); en dar güven aralığı CNN'de ($\pm 0.0196$). | **Kısmen Doğrulandı** (Transformer en zayıf; CNN > LSTM üstünlüğü yok) |
+| **Bağlam Uzunluğu:** Transformer bağlam arttıkça ($24 \to 168\text{s}$) LSTM'e göre daha belirgin kazanır; LSTM 168 adımda doyuma ulaşır. | Transformer 24 saatte 0.239 iken 168 saatte 0.327'ye fırlayarak şiddetli bozuldu. LSTM $0.231 \to 0.229$ (güven aralıkları çakışıyor, anlamlı değişim yok). | **Reddedildi** (Transformer uzun bağlamda ezildi; LSTM bağlamdan etkilenmedi) |
+| **Çıkarım Hızı (Latency):** CNN en düşük, Transformer en yüksek gecikmeye sahip olur. | Median gecikme: LSTM 0.58 ms, CNN 1.10 ms, Transformer 2.04 ms. | **Kısmen Doğrulandı** (Transformer en yavaş; ancak LSTM konvolüsyondan daha hızlı) |
 
-**Sınırlılıklar:** tek kaynak kovan ve tek test dönemi (2019 Şubat–Mayıs, bir mevsim); transfer kovanı yalnızca 12 saatlik çözünürlükte; tuning bütçesi küçük (6 deneme); modeller trivial referanslara göre sınırlı kazanç sağlıyor.
+---
+
+### 7.3 Sentez: "Hangi Koşulda Hangi Mimari, Neden?"
+
+> **Kovan Telemetri Tahmininde Mimari Seçim Kararı:**  
+> Kovan sensör verilerinin orta ölçekli veri hacmi (~48k–50k parametre rejimi, tek kovan kaynağı) ve güçlü 24 saatlik sirkadiyen periyodu altında, **Causal CNN ve LSTM istatistiksel olarak eşdeğer doğruluk sağlamaktadır; dolayısıyla seçim doğruluğa değil donanım ve dağıtım kısıtlarına göre yapılmalıdır.** Düşük bellekli mikrodenetleyicilerde (MCU) ve gerçek zamanlı sensör akışında (streaming edge computing) **LSTM** en düşük gecikme ($0.58\text{ ms}$) ve minimum bellek ayak iziyle birincil tercihtir; yüksek paralelleştirilebilir eğitim ve uzun bağlamları gradyan sönümlenmesi olmadan taşıma ihtiyacında ise **Causal CNN (TCN)** en güvenilir çözümdür. Buna karşılık, **Causal Transformer**, zayıf endüktif yanlılığı, yüksek veri açlığı ve aşırı öğrenme eğilimi nedeniyle küçük/orta ölçekli tekil kovan tahminlerinde ve uzun pencerelerde kesinlikle önerilmemektedir. Yeni bir kovana az veriyle ($n \le 7$ gün) geçişte ise sıfırdan eğitime kıyasla omurgayı donduran **Linear Probe**, aşırı ezberlemeyi engelleyen en dengeli transfer stratejisidir.
+
+**Metodolojik Sınırlılıklar:**  
+Tek kaynak kovan ve tek kilitli test dönemi (2019 Bahar); transfer kovanının yalnızca 12 saatlik çözünürlükte olması; hiperparametre arama bütçesinin 6 deneme ile sınırlı tutulması; modellerin basit eğitim ortalaması referansına göre sınırlı (%13) kazanç sağlaması.

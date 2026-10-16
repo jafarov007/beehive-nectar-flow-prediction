@@ -1,37 +1,57 @@
-# Kovan Ağırlık Değişimi Tahmini - Hipotez Raporu (Aşama 2)
+# Kovan Ağırlık Değişimi Tahmini — Eğitim Öncesi Hipotez ve Endüktif Yanlılık Raporu
+
 **Tarih:** 16 Ekim 2026  
-**Problem:** Kovan sensör verileri (ağırlık, iç sıcaklık, iç nem) ve dış hava durumu verileri kullanılarak sonraki 24 saatteki ağırlık değişiminin ($\Delta \text{weight}_{t+24}$ - nektar akışı) tahmini.  
-**Karşılaştırılan Mimariler:** Causal Dilated Residual CNN (TCN), LSTM, Causal Masked Transformer.
+**Problem:** Kovan telemetri sensörleri ($w_t, T_{\text{in}}, H_{\text{in}}$) ve saatlik dış meteoroloji verileri ($T_{\text{out}}, H_{\text{out}}, P_{\text{out}}, V_{\text{wind}}$) kullanılarak sonraki 24 saatteki kovan ağırlığı değişiminin ($\Delta \text{weight}_{t+24} \in \mathbb{R}$, nektar akışı) kestirimi.  
+**Karşılaştırılan Mimariler:** Causal Dilated Residual CNN (TCN), Long Short-Term Memory (LSTM), Causal Masked Transformer.
 
 ---
 
-## 1. Endüktif Yanlılık (Inductive Bias) Çerçevesinde Mimari Analizi
+## 1. Endüktif Yanlılık (Inductive Bias) Çerçevesinde Teorik Mimari Analizi
 
-Model performanslarını belirleyen en temel teorik unsur, seçilen mimarinin probleme özgü veri yapısına dair taşıdığı öncül varsayımlardır (endüktif yanlılık):
+Makine öğreniminde bir modelin genelleştirme kabiliyeti, hipotez uzayının ($\mathcal{H}$) problemin fiziksel ve biyolojik veri üretim sürecine uyumlu öncül varsayımlarla (endüktif yanlılık) ne ölçüde kısıtlandığına bağlıdır:
+
+$$\hat{f} = \arg\min_{f \in \mathcal{H}} \mathcal{L}_{\text{train}}(f) + \Omega(f)$$
 
 ### A. Causal Dilated Residual CNN (TCN)
-* **Endüktif Yanlılık:** **Yerellik (Locality)** ve **Zamansal Öteleme Eşdeğerliği (Temporal Translation Equivariance)**.
-* **Kovan Dinamiklerine Uyumu:** Kovan içi metabolik aktiviteler ve nektar akışı 24 saatlik güneş döngüsüne ve periyodik hava hareketlerine sıkı sıkıya bağlıdır. CNN, çekirdek ağırlıklarını tüm zaman boyunca paylaşarak yerel desenleri (örn. sabah çıkışındaki sıcaklık-ağırlık ilişkisi) konumdan bağımsız olarak tanır. Dilation mekanizması sayesinde uzun geçmişi (haftalık 168 saati) hiyerarşik olarak sıkıştırmadan kavrar.
-* **Beklenti:** Veri boyutunun küçük/orta ölçekli olduğu bu senaryoda aşırı öğrenmeye (overfitting) karşı en dirençli ve en kararlı model olacaktır.
+* **Temel Endüktif Yanlılık:** **Yerellik (Locality)** ve **Zamansal Öteleme Eşdeğerliği (Temporal Translation Equivariance)**:
+  $$f(\mathcal{T}_\tau X) = \mathcal{T}_\tau f(X)$$
+* **Biyolojik Kovan Dinamiklerine Uyumu:**  
+  Bal arılarının (*Apis mellifera*) nektar toplama uçuşları, kovan içi havalandırma faaliyetleri ve metabolik tüketimi, doğrudan 24 saatlik güneş döngüsüne (sirkadiyen ritim) ve yerel sıcaklık değişimlerine bağlıdır. Konvolüsyonel çekirdekler zaman ekseni boyunca ağırlık paylaştığı için (weight sharing), günün belirli saatlerinde ortaya çıkan tipik mikro-örüntüleri (örn. sabah uçuş başlangıcındaki ani ağırlık kaybı veya akşam nektar depolaması) zamansal konumdan bağımsız olarak çok az serbest parametreyle öğrenebilir.
+* **Genişletilmiş Geçmiş (Dilation):**  
+  Üstel artan dilation faktörleri ($d \in \{1, 2, 4, 8, 16, 32\}$) sayesinde, 168 saatlik haftalık hava örüntüleri herhangi bir bilgi sıkıştırma darboğazına (compression bottleneck) uğramadan hiyerarşik olarak $RF=253$ adımlık bir kapsama alanında işlenir.
+* **Ampirik Beklenti:**  
+  Kısıtlı etiketli veri hacminde (~10.000 saatlik eğitim örneği) güçlü yapısal kısıtları sayesinde **aşırı öğrenmeye (overfitting) en dirençli** ve en düşük genelleştirme varyansına sahip mimari olması beklenmektedir.
 
-### B. LSTM (Long Short-Term Memory)
-* **Endüktif Yanlılık:** **Ardışıklık (Recurrence)** ve **Markovian Durum Güncellemesi (State-Space Bottleneck)**.
-* **Kovan Dinamiklerine Uyumu:** Kovanın bir anlık biyolojik kütlesi ve koloninin gücü, geçmiş zaman adımlarının kümülatif birikimidir. LSTM’in gizli durumu ($h_t$) ve hücre hafızası ($c_t$), koloninin iç durumunu taşımak için doğal bir yapı sunar.
-* **Kısıt ve Beklenti:** 168 adımlık uzun bağlamlarda BPTT sırasında gradyan sönümlenmesi (vanishing gradient) ve sabit boyutlu durum vektörünün uzun geçmişi özetlemede yaşayacağı bilgi kaybı (compression bottleneck) nedeniyle CNN'in biraz gerisinde kalması beklenmektedir.
+### B. Long Short-Term Memory (LSTM)
+* **Temel Endüktif Yanlılık:** **Ardışıklık (Strict Recurrence)** ve **Markovian Durum Güncellemesi**:
+  $$h_t, c_t = \text{LSTM}(x_t, h_{t-1}, c_{t-1})$$
+* **Biyolojik Kovan Dinamiklerine Uyumu:**  
+  Kovanın mevcut biyokütlesi, yavru alanı büyüklüğü ve bal stoku kümülatif birikimli bir durum değişkenidir (state variable). LSTM hücresinin gizli durumu ($h_t \in \mathbb{R}^H$) ve bellek hücresi ($c_t \in \mathbb{R}^H$), biyolojik koloninin içsel dinamik durumunu zamanda ileriye doğru taşımak için son derece doğal bir endüktif yanlılığa sahiptir.
+* **Teorik Kısıt:**  
+  Buna karşılık, 168 zaman adımı boyunca geriye yayılımda (BPTT), kapı gradyanlarının kümülatif çarpımı nedeniyle gradyan sönümlenmesi (vanishing gradient) kaçınılmazdır. Ayrıca sabit boyutlu ($H=60$) tek bir vektörün 7 günlük meteorolojik fırtına/kuraklık geçmişini sıkıştırma zorunluluğu bilgi kaybına yol açabilir.
+* **Ampirik Beklenti:**  
+  Kısa bağlamlarda çok güçlü bir performans sergilemesi, ancak bağlam 168 saate uzadığında doyuma ulaşarak CNN'in bir miktar gerisinde kalması beklenmektedir.
 
 ### C. Causal Masked Transformer
-* **Endüktif Yanlılık:** **Global İlişki ve Düşük Yapısal Yanlılık (Weak Inductive Bias)**.
-* **Kovan Dinamiklerine Uyumu:** Transformer, adımlar arasındaki bağımsızlığı varsaymaz; dinamik self-attention ile herhangi iki saat arasındaki (örn. 5 gün önceki yağış ile bugünkü ağırlık) doğrudan korelasyonu yakalayabilir.
-* **Kısıt ve Beklenti:** Konumsal öteleme değişmezliği doğuştan gelmediği (yalnızca positional encoding ile öğrenildiği) ve self-attention mekanizması yüksek veri hacmine ihtiyaç duyduğu için, sınırlı sayıdaki kovan verisinde aşırı öğrenmeye en yatkın model olacaktır.
+* **Temel Endüktif Yanlılık:** **Global İlişkisellik ve Zayıf Yapısal Yanlılık (Weak Inductive Bias)**:
+  $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d}} + M\right) V, \quad M_{ij} = \begin{cases} 0, & i \ge j \\ -\infty, & i < j \end{cases}$$
+* **Biyolojik Kovan Dinamiklerine Uyumu:**  
+  Transformer mimarisi, adımlar arasında doğuştan gelen hiçbir yerellik veya ardışıklık varsaymaz. Dinamik dikkat matrisi sayesinde, örneğin 5 gün önceki şiddetli bir yağış ile bugünkü nektar açığı arasında doğrudan $\mathcal{O}(1)$ mesafeli bağ kurabilir.
+* **Teorik Kısıt:**  
+  Zaman serilerinde konumsal sıra bilgisi mimarinin içine gömülü değildir; yalnızca sinüzoidal konumsal kodlama ($PE$) ile modele sonradan eklenir. Zayıf endüktif yanlılığa sahip modellerin düzenlilikleri sıfırdan öğrenebilmesi için devasa veri hacimleri gereklidir.
+* **Ampirik Beklenti:**  
+  Tek bir kovanın kısıtlı verisinde, serbest parametrelerin aşırı esnekliği nedeniyle eğitim kümesine kolayca aşırı uyum sağlayacağı (overfitting) ve test kümesinde en yüksek genelleştirme hatasını ve en geniş güven aralığını üreteceği öngörülmektedir.
 
 ---
 
-## 2. Önceden Belirlenen Hipotez (Eğitim Öncesi Öngörü)
+## 2. Eğitim Öncesi Hipotez Kararları (Nihai Sıralama Öngörüsü)
 
-1. **Az ve Orta Ölçekli Veride:**  
-   $$\text{Causal CNN} \ge \text{LSTM} > \text{Causal Transformer}$$
-   Causal CNN, güçlü yerel yanlılığı ve dilation sayesinde en düşük test hatasını (MAE/RMSE) ve en dar güven aralığını verecektir.
-2. **Bağlam Uzunluğu Arttıkça (1 Gün $\to$ 3 Gün $\to$ 7 Gün):**  
-   Transformer'ın bağlam genişledikçe performans artışı LSTM'e kıyasla daha belirgin olacak; LSTM ise 168 adımda gradyan sönümlemesi nedeniyle doyuma ulaşacaktır.
-3. **Çıkarım Hızı (Latency):**  
-   Causal CNN paralelleştirilebilir konvolüsyon yapısıyla CPU üzerinde en düşük p50/p95 gecikmesini sunarken, Transformer matris çarpımları nedeniyle en yüksek gecikmeye sahip olacaktır.
+Eğitim boru hattı başlatılmadan önce aşağıdaki üç spesifik hipotez kayıt altına alınmıştır:
+
+1. **Ana Performans Sıralaması (Kilitli Test Kümesi):**  
+   $$\text{Causal Dilated CNN (TCN)} \ge \text{LSTM} > \text{Causal Transformer}$$
+   *Gerekçe:* Yerellik ve öteleme eşdeğerliği, 24 saatlik sirkadiyen kovan döngüsünü modellemek için en güçlü koruyucu yanlılıktır.
+2. **Bağlam Uzunluğuna Duyarlılık ($24\text{s} \to 72\text{s} \to 168\text{s}$):**  
+   Transformer'ın bağlam genişledikçe göreceli hata düşüşü LSTM'e kıyasla daha belirgin olacak; LSTM ise 168 adımda gradyan sönümlenmesi ve durum sıkışması nedeniyle doyuma ulaşacaktır.
+3. **Çıkarım Gecikmesi (CPU Latency, Batch=1):**  
+   Paralel konvolüsyonel çekirdekler sayesinde Causal CNN en düşük çıkarım gecikmesini ($p_{50}, p_{95}$) sunacak; yoğun matris çarpımları nedeniyle Transformer en yüksek gecikmeye sahip olacaktır.
