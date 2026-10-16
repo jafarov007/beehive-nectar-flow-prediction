@@ -62,7 +62,7 @@ To capture both daily foraging cycles ($24\text{h}$) and weekly synoptic weather
 
 For an $L$-layer residual network with two dilated convolutions per block (kernel size $k=3$) and exponential dilations $d_i \in \{1, 2, 4, 8, 16, 32\}$:
 
-$$RF = 1 + 2 \cdot (k - 1) \cdot \sum_{i=1}^{L} d_i = 1 + 2 \cdot (3 - 1) \cdot 63 = \mathbf{253 \ge 168} \quad (\checkmark)$$
+$$RF = 1 + 2 \cdot (k - 1) \cdot \sum_{i=1}^{L} d_i = 1 + 2 \cdot (3 - 1) \cdot 63 = \mathbf{253} \ge 168$$
 
 *(Verified empirically via input gradient propagation: exact non-zero gradient span $= 253$ steps).*
 

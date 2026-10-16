@@ -4,7 +4,7 @@
 **Ders:** BM 618 - Derin Öğrenme ve Büyük Dil Modelleri  
 **Öğretim Üyesi:** Dr. Öğr. Üyesi Ahmet ALBAYRAK  
 
-> **Doğrulama Notu:** Bu rapordaki tüm parametre ve MAC sayıları **önce analitik matematiksel formüllerle elle türetilmiş**, ardından PyTorch tensör kancaları (`forward hook`) ve tensör boyutları üzerinden çalışan test betiğiyle (`python src/models.py`) **birebir doğrulanmıştır**. Kod çıktısı analitik hesaplamalarla %100 tam eşleşmektedir.
+> **Metodolojik Not:** Bu raporda yer alan tüm mimarilere ait serbest parametre ve MAC (Multiply-Accumulate) sayıları, katman bazında analitik matematiksel bağıntılarla formüle edilmiş; ardından PyTorch tensör kancaları (`forward hook`) aracılığıyla doğrulanmıştır (`python src/models.py`). Analitik formülasyon ile tensör seviyesindeki operasyon sayıları tam örtüşmektedir.
 
 ---
 
@@ -28,10 +28,10 @@ $$RF = 1 + 2 \cdot (k - 1) \cdot \sum_{i=1}^{L} d_i = 1 + 4 \cdot \sum_{i=1}^{L}
 $L=6$ blok ve $d_i = 2^{i-1} \in \{1, 2, 4, 8, 16, 32\}$ üstel artış seçildiğinde:
 $$\sum_{i=1}^{6} d_i = 1 + 2 + 4 + 8 + 16 + 32 = 63$$
 
-$$RF = 1 + 4 \cdot 63 = \mathbf{253} \ge 168 \quad (\checkmark)$$
+$$RF = 1 + 4 \cdot 63 = \mathbf{253} \ge 168$$
 
-*Kritik İnceleme:* Eğer 5 blok seçilseydi ($\sum d = 31$), $RF = 1 + 4 \cdot 31 = 125 < 168$ kalacak ve haftalık hava geçmişi kapsanamayacaktı. Bu nedenle $L=6$ blok teorik bir zorunluluktur.  
-*Ampirik Doğrulama:* Son çıktı adımının girdiye göre gradyanı ($\partial \hat{y} / \partial x_t$) geriye doğru taranmış; gradyanın sıfırdan farklı olduğu en eski zaman adımı **tam 253 adım** olarak ölçülmüştür.
+**Katman Sayısı Seçiminin Gerekçesi:** Eğer 5 blok seçilseydi ($\sum d = 31$), $RF = 1 + 4 \cdot 31 = 125 < 168$ kalacak ve haftalık hava geçmişi kapsanamayacaktı. Bu nedenle $L=6$ blok teorik bir zorunluluktur.  
+**Ampirik RF Doğrulaması:** Son çıktı adımının girdiye göre gradyanı ($\partial \hat{y} / \partial x_t$) geriye doğru taranmış; gradyanın sıfırdan farklı olduğu en eski zaman adımı tam 253 adım olarak kaydedilmiştir.
 
 ### 1.3 Bağlam Penceresi Analizi İçin Mimari Kalibrasyonu
 Pencere boyutu $W \in \{24, 72, 168\}$ analizinde modellerin iso-parametre (~50k) şartını korumak için kanal sayıları ($C$) ayarlanmıştır:
@@ -80,7 +80,7 @@ $$\mathbf{\text{Toplam Parametre}} = 17,040 + 29,280 + 1,985 = \mathbf{48,305}$$
 
 $$\mathbf{\text{Toplam Parametre}} = 440 + 47,916 + 1,473 = \mathbf{49,829}$$
 
-$$\text{Maksimum Model Parametre Sapması} = \frac{49,829 - 48,305}{48,305} \times 100 = \mathbf{3.1\% \le 5\%} \quad (\text{İzo-parametre koşulu sağlandı})$$
+$$\text{Maksimum Model Parametre Sapması} = \frac{49,829 - 48,305}{48,305} \times 100 = \mathbf{3.1\% \le 5\%}$$
 
 ---
 
@@ -125,4 +125,4 @@ $$\mathbf{\text{Toplam MAC}} = 66,528 + 3,902,976 + 7,451,136 + 3,902,976 + 1,44
 | **LSTM (2 Katman)** | **48,305** | **7.62 M** | $\mathbf{0.97\times}$ | **0.58 ms** |
 | **Causal Transformer** | **49,829** | 15.33 M | $1.94\times$ | 2.04 ms |
 
-> **Metodolojik Not:** Causal maske nedeniyle dikkat matrisinin alt üçgeni kullanılır; ancak PyTorch CPU üzerinde tam $T \times T$ yoğun matris çarpımı yapıp ardından maskelediği için donanım seviyesinde yoğun (dense) MAC gerçekleşir. LSTM işlem yükünde CNN ile başa baş iken, zaman adımları sıralı ilerlediği için paralelleşemez; fakat tekil batch ($B=1$) çıkarımında en düşük işlem hafızasıyla en hızlı model olmuştur.
+> **Metodolojik Not:** Causal maske nedeniyle dikkat matrisinin alt üçgeni kullanılır; ancak PyTorch CPU üzerinde tam $T \times T$ matris çarpımı yapıp ardından maskelediği için donanım seviyesinde yoğun (dense) MAC gerçekleşir. LSTM işlem yükünde CNN ile başa baş iken, zaman adımları sıralı ilerlediği için paralelleşemez; fakat tekil batch ($B=1$) çıkarımında en düşük bellek ayak iziyle en hızlı model olmuştur.

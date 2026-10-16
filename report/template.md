@@ -39,57 +39,59 @@ Burada $F=9$ giriş özelliğini temsil etmektedir:
      * **Eğitim Kümesi (Train):** 2017-01-01 – 2018-05-31 (Model parametrelerinin optimizasyonu)
      * **Doğrulama Kümesi (Val):** 2018-10-01 – 2019-02-23 (Hiperparametre seçimi ve early stopping)
      * **Kilitli Test Kümesi (Test):** 2019-02-24 – 2019-05-20 (Sonuçlar kesinleşene kadar dokunulmamış nihai değerlendirme dönemi)
-     * Sızıntıyı (lookahead temporal leakage) engellemek amacıyla dönemler arasına en az pencere boyutu ($W=168$ saat) tampon boşluk bırakılmıştır.
-     * Normalizasyon istatistikleri ($\mu, \sigma$) **yalnızca eğitim kümesinden** hesaplanmış, doğrulama ve test kümelerine sızdırılmamıştır.
+     * Geleceğe sızıntıyı (lookahead temporal leakage) engellemek amacıyla dönemler arasına en az pencere boyutu ($W=168$ saat) tampon boşluk bırakılmıştır.
+     * Normalizasyon istatistikleri ($\mu, \sigma$) yalnızca eğitim kümesinden hesaplanmış, doğrulama ve test kümelerine sızdırılmamıştır.
 2. **Bad Schwartau Kovanı (Ayrılmış Transfer Kovanı):**  
    * Ağırlık ve nem ölçümleri günde 2 kez (12 saatte bir) kaydedildiği için 12 saatlik adımlarda yeni (görülmemiş) transfer kovanı olarak kurgulanmıştır.
 
 ---
 
-## 2. Hipotez (Eğitimden Önce — Endüktif Yanlılık Çerçevesi)
+## 2. Hipotez ve Endüktif Yanlılık (Eğitim Öncesi Teorik Değerlendirme)
 
-Model performanslarını belirleyen en temel teorik unsur, seçilen mimarinin kovan biyolojisine ve zaman serisi dinamiğine dair taşıdığı öncül yapısal varsayımlardır:
+Bir derin öğrenme modelinin kovan telemetrisi gibi karmaşık biyolojik zaman serilerindeki genelleştirme başarısı, mimarinin kovan dinamiklerine dair taşıdığı yapısal öncül varsayımlarla (endüktif yanlılık) ne ölçüde örtüştüğüne bağlıdır. Eğitim boru hattı çalıştırılmadan önce üç mimari kuramsal olarak şöyle değerlendirilmiştir:
 
-1. **Causal Dilated Residual CNN (TCN):**  
-   * *Endüktif Yanlılık:* Güçlü yerellik (locality) ve zamansal öteleme eşdeğerliği (temporal translation equivariance).  
-   * *Beklenti:* 24 saatlik döngüsel biyolojik ritim her gün kendini tekrarlar. CNN çekirdek ağırlıklarını zamanda paylaştığı için sabah uçuşu ve akşam nektar depolaması gibi periyodik örüntüleri çok az parametreyle kararlı öğrenir. Dilation sayesinde 168 saatlik geçmişi sıkıştırma darboğazı olmadan görür. Küçük ve orta ölçekli kovan verisinde aşırı öğrenmeye (overfitting) en dirençli mimari olması beklenir.
-2. **LSTM (Long Short-Term Memory):**  
-   * *Endüktif Yanlılık:* Ardışıklık (recurrence) ve Markovian gizli durum sıkıştırması.  
-   * *Beklenti:* Kovanın anlık biyokütlesi birikimli bir durumdur; LSTM hücresi bunu taşımada doğaldır. Ancak 168 zaman adımı boyunca geriye yayılımda (BPTT) gradyan sönümlenmesi yaşanması ve sabit boyutlu gizli vektörün uzun geçmişi özetlemede zorlanması beklenir.
-3. **Causal Masked Transformer:**  
-   * *Endüktif Yanlılık:* Global dinamik dikkat ve zayıf yapısal yanlılık (weak inductive bias).  
-   * *Beklenti:* Tüm adımlar arası doğrudan korelasyon kurabilir; ancak konumsal değişmezliği doğuştan bilmediği ve yüksek veri hacmi istediği için bu veri ölçeğinde aşırı öğrenmeye en açık model olacaktır.
+**Causal Dilated Residual CNN (TCN):**  
+Konvolüsyonel mimariler, güçlü yerellik (*locality*) ve zamansal öteleme eşdeğerliği (*temporal translation equivariance*) varsayımı taşır. Bal arılarının (*Apis mellifera*) nektar toplama, kovan havalandırma ve metabolik tüketim faaliyetleri 24 saatlik güneş döngüsüne (sirkadiyen ritim) sıkı sıkıya bağlıdır. Çekirdek ağırlıklarının zaman boyunca paylaşılması (*weight sharing*), sabah çıkışlarındaki kütle kaybı veya akşam nektar depolanması gibi mikro-örüntülerin zamansal konumdan bağımsız olarak az sayıda parametreyle kararlı öğrenilmesini sağlar. Üstel artan dilation mekanizması ($d \in \{1, 2, 4, 8, 16, 32\}$) ise 168 saatlik haftalık hava dalgalarını herhangi bir sıkıştırma darboğazı (*bottleneck*) olmaksızın $RF=253$ adımlık kapsama alanında işler. Bu yapısal avantajlar sebebiyle CNN'in kısıtlı veride aşırı öğrenmeye (*overfitting*) en dirençli mimari olması beklenmiştir.
 
-*Eğitim Öncesi Tahmin Sıralaması:*  
+**Long Short-Term Memory (LSTM):**  
+LSTM, katı bir ardışıklık (*recurrence*) ve Markovian gizli durum güncellemesi varsayımına dayanır. Kovanın anlık biyokütlesi, yavru alanı büyüklüğü ve bal stoku geçmişin kümülatif birikimidir; dolayısıyla LSTM hücresinin gizli durumu ($h_t$) koloninin içsel durumunu ileriye taşımak için doğal bir yapı sunar. Buna karşılık, 168 zaman adımı boyunca geriye yayılımda (BPTT) gradyan sönümlenmesi kaçınılmazdır. Ayrıca sabit boyutlu tek bir gizli vektörün ($H=60$) 7 günlük çok değişkenli geçmişi özetleme zorunluluğu bilgi kaybına yol açacağından, modelin CNN'in bir miktar gerisinde kalacağı öngörülmüştür.
+
+**Causal Masked Transformer:**  
+Transformer, adımlar arasında doğuştan gelen yerellik veya ardışıklık varsaymaz; zayıf yapısal yanlılığa (*weak inductive bias*) ve dinamik ikili dikkat (*pairwise attention*) mekanizmasına dayanır. Kuramsal olarak 5 gün önceki yağış ile bugünkü nektar açığı arasında doğrudan korelasyon kurabilse de, konumsal değişmezliği doğuştan bilmediği ve serbest parametre uzayı çok esnek olduğu için sınırlı veri hacminde aşırı öğrenmeye en açık model olacağı; dolayısıyla test kümesinde en yüksek genelleştirme hatasını vereceği hipotez edilmiştir.
+
+**Eğitim Öncesi Tahmin Sıralaması:**  
 $$\text{Causal CNN} \ge \text{LSTM} > \text{Causal Transformer}$$
 
 ---
 
 ## 3. Tasarım: Receptive Field, Parametre ve MAC Hesabı
 
-* **Receptive Field (RF) Türetimi:**  
-  Saatlik veride 7 günlük hava ve kovan döngüsünü kapsamak için zorunlu hedef: $RF \ge 168$ adım.  
-  Residual blok başına 2 adet dilated conv ($k=3$), $d \in \{1, 2, 4, 8, 16, 32\}$ için:
-  $$RF = 1 + 2 \cdot (k - 1) \cdot \sum_{i=1}^{L} d_i = 1 + 2 \cdot (3 - 1) \cdot 63 = 253 \ge 168 \;\checkmark$$
-  *(Ampirik gradyan testi ile doğrulanan RF: tam 253 adım).*
-* **İzo-Parametre Bütçesi (~48k–50k Parametre):**
-  * Causal CNN: 48,665 parametre ($C=36$, 6 blok)
-  * LSTM: 48,305 parametre ($H=60$, 2 katman)
-  * Causal Transformer: 49,829 parametre ($d=44$, $d_{ff}=88$, 3 katman, 4 kafa)
+### 3.1 Receptive Field (Alıcı Alan) Türetimi
+Saatlik veride 7 günlük hava ve kovan döngüsünü kapsamak için zorunlu hedef $RF \ge 168$ adımdır. Residual blok başına 2 adet dilated conv ($k=3$), $d \in \{1, 2, 4, 8, 16, 32\}$ ($L=6$) için alıcı alan formülü:
+
+$$RF = 1 + 2 \cdot (k - 1) \cdot \sum_{i=1}^{L} d_i = 1 + 2 \cdot (3 - 1) \cdot 63 = \mathbf{253} \ge 168$$
+
+Girdiye göre geriye yayılan gradyan profilinin sıfırdan farklı olduğu en eski zaman adımı tam 253 adım olarak tespit edilmiş ve kuramsal alıcı alan ampirik olarak doğrulanmıştır.
+
+### 3.2 İzo-Parametre Bütçesi (~48k–50k Parametre)
+Adil karşılaştırma amacıyla tüm modeller ~48k–50k parametre bandında kalibre edilmiştir (maksimum model parametre farkı $\le \%3.1$):
+* **Causal CNN:** 48,665 parametre ($C=36$, 6 residual blok)
+* **LSTM:** 48,305 parametre ($H=60$, 2 katman)
+* **Causal Transformer:** 49,829 parametre ($d=44$, $d_{ff}=88$, 3 katman, 4 kafa)
 
 ---
 
 ## 4. Karşılaştırma (5 Seed, Eşit Bütçe, %95 Güven Aralığı)
 
-Deneysel karşılaştırmanın tam anlamıyla adil, tarafsız ve izo-hesaplama koşullarında yürütülmesi amacıyla tüm modellerde **aynı eğitim ve hiperparametre optimizasyon protokolü** katı şekilde uygulanmıştır:
-* **Tuning Bütçesi:** Her üç model için de aynı rastgele tohumdan (`seed=1234`) türetilen 6 hiperparametre adayı (learning rate, dropout, weight decay), deneme başına maksimum 10 epoch ve $patience=5$ erken durdurma ile yalnızca Doğrulama (Val) kümesi üzerinde değerlendirilmiştir.
-* **Final Eğitim Bütçesi ve Hiperparametre Eşitliği:** Seçilen en iyi hiperparametrelerle her model 5 bağımsız tohumda (`seed=0, 1, 2, 3, 4`) sıfırdan eğitilmiştir. Her üç model için:
+Deneysel karşılaştırmanın tarafsız ve izo-hesaplama koşullarında yürütülmesi amacıyla tüm modellerde katı bir eğitim ve optimizasyon protokolü uygulanmıştır:
+* **Tuning Bütçesi:** Her üç model için aynı rastgele tohumdan (`seed=1234`) türetilen 6 hiperparametre adayı (öğrenme oranı, dropout, weight decay), deneme başına maksimum 10 epoch ve $patience=5$ erken durdurma ile yalnızca Doğrulama (Val) kümesi üzerinde değerlendirilmiştir.
+* **Final Eğitim Bütçesi ve Hiperparametre Eşitliği:** Seçilen en iyi hiperparametrelerle her model 5 bağımsız tohumda (`seed=0, 1, 2, 3, 4`) sıfırdan eğitilmiştir:
   * **Maksimum Epoch Sınırı:** 25 epoch (tüm modeller için sabit üst sınır).
   * **Mini-batch Boyutu (Batch Size):** 64 (tüm modeller ve tohumlar için sabit).
-  * **Optimizatör ve Kayıp Fonksiyonu:** AdamW optimizatörü, Huber Loss ($\delta=1.0$), gradyan kırpma (gradient clipping, `max_norm=1.0`), öğrenme oranı zamanlayıcısı (`ReduceLROnPlateau`, factor=0.5, patience=2).
-  * **Erken Durdurma (Early Stopping):** $patience = 5$ epoch (Doğrulama MAE değeri ardışık 5 epoch boyunca $\ge 10^{-5}$ iyileşme göstermediğinde eğitim otomatik kesilir ve hafızadaki en iyi doğrulama kontrol noktası [checkpoint] geri yüklenir).
-* **Ortalama Epoch Farkının Sebebi (8.4 / 9.2 / 10.2):** Tablodaki ortalama epoch sayılarının küçük farklılıklar göstermesi (CNN: 8.4, LSTM: 9.2, Transformer: 10.2), modellere farklı eğitim süresi verilmesinden **değildir**. Tüm modellere eşit 25 epoch verilmiş, ancak erken durdurma mekanizması modellerin yakınsama ve aşırı öğrenme hızlarına göre eğitimi farklı noktalarda (CNN: 6–14 epoch, LSTM: 6–14 epoch, Transformer: 8–12 epoch) sonlandırmıştır.
-* **Kilitli Test Seti İzolasyonu:** Test kümesi hiperparametre seçiminde, epoch belirlemede veya erken durdurmada **asla kullanılmamış**; sadece en iyi ağırlıklar yüklendikten sonra her tohum için yalnızca bir kez nihai metrik ölçümü yapılmıştır.
+  * **Optimizatör ve Kayıp Fonksiyonu:** AdamW optimizatörü, Huber Loss ($\delta=1.0$), gradyan kırpma (`max_norm=1.0`), öğrenme oranı zamanlayıcısı (`ReduceLROnPlateau`, factor=0.5, patience=2).
+  * **Erken Durdurma (Early Stopping):** $patience = 5$ epoch (Doğrulama MAE değeri ardışık 5 epoch boyunca $\ge 10^{-5}$ iyileşme göstermediğinde eğitim kesilir ve doğrulama hatasını minimize eden model ağırlıkları geri yüklenir).
+* **Eğitim Dinamikleri ve Yakınsama:** Tabloda raporlanan ortalama epoch sayıları (CNN: 8.4, LSTM: 9.2, Transformer: 10.2), her üç mimarinin eğitim kümesindeki öğrenme dinamiklerini ve doğrulama kaybının erken durdurma kriterine ulaşma hızını yansıtmaktadır. Tüm mimariler sabit 25 epoch üst sınırıyla başlatılmış; erken durdurma mekanizması modellerin aşırı öğrenmeye girdiği noktalarda eğitimi nesnel olarak sonlandırmıştır.
+* **Kilitli Test Seti İzolasyonu:** Test kümesi hiperparametre seçiminde veya eğitim sırasında hiçbir aşamada kullanılmamış; yalnızca en iyi ağırlıklar yüklendikten sonra her tohum için bir kez nihai değerlendirme amacıyla çalıştırılmıştır.
 
 ### Hiperparametre Optimizasyonu (Tuning)
 {{TABLE_TUNING}}
@@ -133,10 +135,10 @@ Yeni kovandan yalnızca $n \in \{2, 7, 30\}$ günlük etiketli veri kullanılara
 3. **Fine-Tuning (Düşük learning rate ile tüm model)**
 
 **Tohum ve Güven Aralığı Protokolü (5 Seed):**  
-Ana deneyde olduğu gibi, transfer öğrenme aşaması da rastgeleliği kontrol altına almak için **5 bağımsız tohum (seed = 0, 1, 2, 3, 4)** ile yürütülmüştür:
+Ana deneyde olduğu gibi transfer öğrenme aşaması da rastgeleliği kontrol altına almak için **5 bağımsız tohum (seed = 0, 1, 2, 3, 4)** ile yürütülmüştür:
 * Her tohum için önce Würzburg kaynak kovanında ilgili model sıfırdan ön eğitilmiş,
 * Ardından Bad Schwartau hedef kovanında her $n$ ($n \in \{2, 7, 30\}$ gün) ve her transfer yöntemi (sıfırdan, linear probe, fine-tuning) için aynı tohumla bağımsız eğitim/adaptasyon gerçekleştirilmiştir (toplam $3 \times 3 \times 3 \times 5 = 135$ transfer deneyi).
-* Tablolardaki tüm $\pm \%95\text{ GA}$ değerleri bu 5 tohum üzerinden Student-$t$ dağılımı ($df=4, t_{crit}=2.776$) ile hesaplanmıştır; tabloda her satır için `#seed = 5` olarak belirtilmiştir.
+* Tablolardaki tüm $\pm \%95\text{ GA}$ değerleri bu 5 tohum üzerinden Student-$t$ dağılımı ($df=4, t_{crit}=2.776$) ile hesaplanmıştır.
 
 ### Transfer Baseline Değerleri
 {{TABLE_TRANSFER_BASE}}
@@ -153,14 +155,14 @@ Ana deneyde olduğu gibi, transfer öğrenme aşaması da rastgeleliği kontrol 
 
 ## 7. Sonuç: "Hangi Koşulda Hangi Mimari, Neden?"
 
-### 7.1 Ampirik Bulguların Özeti
-Aşağıdaki sonuçlar doğrudan bu çalışmadaki ampirik ölçümlerden (5 seed ortalaması, %95 güven aralıkları ve kilitli test dönemi) çıkarılmıştır:
+### 7.1 Bulguların Tartışılması ve İstatistiksel Çıkarımlar
+Kilitli test kümesi üzerinde 5 bağımsız rastgele tohumla elde edilen ölçümler ve hipotez testleri şu sonuçları ortaya koymaktadır:
 
 1. **Causal CNN ve LSTM İstatistiksel Olarak Ayırt Edilemez:**  
-   Kilitli test kümesinde Causal CNN $0.2331 \pm 0.0196\text{ kg}$ ve LSTM $0.2292 \pm 0.0222\text{ kg}$ Test MAE değerine ulaşmıştır. İkili Welch $t$-testi $p = 0.7257$ vermiş ve %95 güven aralıkları tamamen çakışmıştır. Dolayısıyla, eğitim öncesi hipotezde öngörülen $\text{CNN} > \text{LSTM}$ üstünlüğü **desteklenmemiştir**.
+   Kilitli test kümesinde Causal CNN $0.2331 \pm 0.0196\text{ kg}$ ve LSTM $0.2292 \pm 0.0222\text{ kg}$ Test MAE değerine ulaşmıştır. İkili Welch $t$-testi $p = 0.7257$ vermiş ve %95 güven aralıkları tamamen çakışmıştır. Dolayısıyla, eğitim öncesi hipotezde öngörülen $\text{CNN} > \text{LSTM}$ üstünlüğü desteklenmemiştir.
 2. **Causal Transformer Belirgin Biçimde Başarısız Olmuştur:**  
-   Transformer $0.3268 \pm 0.0250\text{ kg}$ Test MAE ile hem CNN'den ($p = 0.0001$) hem LSTM'den ($p < 0.0001$) istatistiksel olarak belirgin düzeyde daha kötü performans göstermiştir. İlginç şekilde, doğrulama (val) aşamasında en düşük hatayı ($0.0824$) elde eden Transformer, test dönemine genelleşememiş ve aşırı öğrenme sergilemiştir. Ayrıca doğrulama dönemi (Ekim–Şubat / Sonbahar-Kış) ile test dönemi (Şubat–Mayıs / İlkbahar) farklı fenolojik mevsimlere denk geldiği için, zayıf endüktif yanlılığa sahip Transformer mevsimsel dağılım kaymasına (seasonal distribution shift) karşı en hassas model olmuştur.
-3. **Uzun Bağlam Penceresi Nektar Akışında Fayda Sağlamamıştır:**  
+   Transformer $0.3268 \pm 0.0250\text{ kg}$ Test MAE ile hem CNN'den ($p = 0.0001$) hem LSTM'den ($p < 0.0001$) istatistiksel olarak belirgin düzeyde daha kötü performans göstermiştir. Doğrulama (val) aşamasında en düşük hatayı ($0.0824$) elde eden Transformer, test dönemine genelleşememiş ve aşırı öğrenme sergilemiştir. Doğrulama dönemi (Ekim–Şubat / Sonbahar-Kış) ile test dönemi (Şubat–Mayıs / İlkbahar) farklı fenolojik mevsimlere denk geldiğinden, zayıf endüktif yanlılığa sahip Transformer mevsimsel dağılım kaymasına (seasonal distribution shift) karşı en hassas model olmuştur.
+3. **Uzun Bağlam Penceresi Nektar Akışında Katkı Sağlamamıştır:**  
    CNN ve LSTM için 1 günlük pencere ($24\text{s}$) 7 günlük pencere ($168\text{s}$) kadar başarılıdır. Transformer ise bağlam $24\text{s} \to 168\text{s}$ uzadıkça hatasını $0.2390$'dan $0.3268$'e yükselterek uzun bağlamdan en çok zarar gören mimari olmuştur.
 4. **LSTM Gradyan Sönümlenmesi ve Pratik Etkisi:**  
    LSTM'de BPTT gradyan normu 168 saat geriye gidildiğinde 9 mertebe azalmıştır ($\text{lag}_{167} / \text{lag}_0 \approx 6.67 \times 10^{-10}$). Buna rağmen LSTM test hatasında CNN ile başa baş kalmıştır; çünkü nektar akışı dinamikleri son 24 saatlik sirkadiyen döngü tarafından domine edilmektedir.
@@ -175,16 +177,16 @@ Aşağıdaki sonuçlar doğrudan bu çalışmadaki ampirik ölçümlerden (5 see
 
 | Hipotez (Eğitim Öncesi Beklenti) | Gözlenen Ampirik Sonuç | Nihai Durum |
 | :--- | :--- | :---: |
-| **Sıralama:** $\text{Causal CNN} \ge \text{LSTM} > \text{Transformer}$ | Test MAE: CNN 0.233, LSTM 0.229, Transformer 0.327 kg/24s. CNN–LSTM farkı anlamsız ($p = 0.73$); en dar güven aralığı CNN'de ($\pm 0.0196$). | **Kısmen Doğrulandı** (Transformer en zayıf; CNN > LSTM üstünlüğü yok) |
-| **Bağlam Uzunluğu:** Transformer bağlam arttıkça ($24 \to 168\text{s}$) LSTM'e göre daha belirgin kazanır; LSTM 168 adımda doyuma ulaşır. | Transformer 24 saatte 0.239 iken 168 saatte 0.327'ye fırlayarak şiddetli bozuldu. LSTM $0.231 \to 0.229$ (güven aralıkları çakışıyor, anlamlı değişim yok). | **Reddedildi** (Transformer uzun bağlamda ezildi; LSTM bağlamdan etkilenmedi) |
-| **Çıkarım Hızı (Latency):** CNN en düşük, Transformer en yüksek gecikmeye sahip olur. | Median gecikme: LSTM 0.58 ms, CNN 1.10 ms, Transformer 2.04 ms. | **Kısmen Doğrulandı** (Transformer en yavaş; ancak LSTM konvolüsyondan daha hızlı) |
+| **Sıralama:** $\text{Causal CNN} \ge \text{LSTM} > \text{Transformer}$ | Test MAE: CNN 0.233, LSTM 0.229, Transformer 0.327 kg/24s. CNN–LSTM farkı istatistiksel olarak anlamsızdır ($p = 0.7257$); en dar güven aralığı CNN'dedir ($\pm 0.0196$). | **Kısmen Doğrulandı** (Transformer en zayıf; CNN > LSTM üstünlüğü gözlenmedi) |
+| **Bağlam Uzunluğu:** Transformer bağlam genişledikçe ($24 \to 168\text{s}$) LSTM'e kıyasla daha belirgin kazanım sağlar; LSTM 168 adımda doyuma ulaşır. | Transformer'ın test hatası bağlam uzadıkça belirgin biçimde artmıştır ($0.2390 \to 0.3268$); LSTM ise bağlam değişiminden etkilenmemiştir ($0.2312 \to 0.2292$). | **Desteklenmedi** (Transformer uzun bağlamda genelleşemedi; LSTM bağlam genişliğine dayanıklılık gösterdi) |
+| **Çıkarım Hızı (Latency):** CNN en düşük, Transformer en yüksek gecikmeye sahip olur. | Medyan gecikme: LSTM 0.58 ms, CNN 1.10 ms, Transformer 2.04 ms. | **Kısmen Doğrulandı** (Transformer en yavaş model; ancak tekil örnek çıkarımında LSTM konvolüsyondan daha düşük gecikme sundu) |
 
 ---
 
-### 7.3 Sentez: "Hangi Koşulda Hangi Mimari, Neden?"
+### 7.3 Sentez ve Mimari Tercih Kriterleri
 
-> **Kovan Telemetri Tahmininde Mimari Seçim Kararı:**  
-> Kovan sensör verilerinin orta ölçekli veri hacmi (~48k–50k parametre rejimi, tek kovan kaynağı) ve güçlü 24 saatlik sirkadiyen periyodu altında, **Causal CNN ve LSTM istatistiksel olarak eşdeğer doğruluk sağlamaktadır; dolayısıyla seçim doğruluğa değil donanım ve dağıtım kısıtlarına göre yapılmalıdır.** Düşük bellekli mikrodenetleyicilerde (MCU) ve gerçek zamanlı sensör akışında (streaming edge computing) **LSTM** en düşük gecikme ($0.58\text{ ms}$) ve minimum bellek ayak iziyle birincil tercihtir; yüksek paralelleştirilebilir eğitim ve uzun bağlamları gradyan sönümlenmesi olmadan taşıma ihtiyacında ise **Causal CNN (TCN)** en güvenilir çözümdür. Buna karşılık, **Causal Transformer**, zayıf endüktif yanlılığı, yüksek veri açlığı ve aşırı öğrenme eğilimi nedeniyle küçük/orta ölçekli tekil kovan tahminlerinde ve uzun pencerelerde kesinlikle önerilmemektedir. Yeni bir kovana az veriyle ($n \le 7$ gün) geçişte ise sıfırdan eğitime kıyasla omurgayı donduran **Linear Probe**, aşırı ezberlemeyi engelleyen en dengeli transfer stratejisidir.
+> **Kovan Telemetri Tahmininde Mimari Tercih Rehberi:**  
+> Kovan sensör verilerinin orta ölçekli veri hacmi (~48k–50k parametre rejimi, tek kovan kaynağı) ve belirgin 24 saatlik sirkadiyen periyodu altında, **Causal CNN ve LSTM istatistiksel olarak eşdeğer doğruluk sağlamaktadır; dolayısıyla seçim kriteri doğruluğa değil donanım ve dağıtım kısıtlarına göre şekillenmelidir.** Düşük bellekli mikrodenetleyicilerde (MCU) ve gerçek zamanlı sensör akışında (streaming edge computing) **LSTM** en düşük gecikme ($0.58\text{ ms}$) ve minimum bellek ayak iziyle birincil tercihtir; yüksek paralelleştirilebilir eğitim ve uzun bağlamları gradyan sönümlenmesi olmadan taşıma ihtiyacında ise **Causal CNN (TCN)** en güvenilir çözümdür. Buna karşılık, **Causal Transformer**, zayıf endüktif yanlılığı, yüksek veri açlığı ve aşırı öğrenme eğilimi nedeniyle küçük/orta ölçekli tekil kovan tahminlerinde ve uzun pencerelerde kesinlikle önerilmemektedir. Yeni bir kovana az veriyle ($n \le 7$ gün) geçişte ise sıfırdan eğitime kıyasla omurgayı donduran **Linear Probe**, aşırı ezberlemeyi engelleyen en dengeli transfer stratejisidir.
 
 **Metodolojik Sınırlılıklar:**  
 Tek kaynak kovan ve tek kilitli test dönemi (2019 Bahar); transfer kovanının yalnızca 12 saatlik çözünürlükte olması; hiperparametre arama bütçesinin 6 deneme ile sınırlı tutulması; modellerin basit eğitim ortalaması referansına göre sınırlı (%13) kazanç sağlaması.
