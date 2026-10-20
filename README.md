@@ -159,7 +159,7 @@ Transferring models pre-trained on Würzburg ($12\text{h}$ resampled grid) to th
 
 ### 1. Environment Setup
 ```bash
-git clone https://github.com/sarkannnn/beehive-nectar-flow-prediction.git
+git clone https://github.com/jafarov007/beehive-nectar-flow-prediction.git
 cd beehive-nectar-flow-prediction
 pip install torch numpy scipy matplotlib python-docx requests
 ```
@@ -188,12 +188,12 @@ python status.py
 If you utilize this benchmark, dataset preprocessing pipeline, or architectural implementations, please cite as follows:
 
 ```bibtex
-@misc{mammadov2026beehive,
-  author       = {Sarkan Mammadov},
+@misc{jafarov2026beehive,
+  author       = {Abdul Jafarov},
   title        = {Beehive Nectar Flow Prediction: Benchmarking Causal CNN, LSTM, and Causal Transformer under Inductive Bias and Iso-Parameter Constraints},
   year         = {2026},
   publisher    = {GitHub},
-  howpublished = {\url{https://github.com/sarkannnn/beehive-nectar-flow-prediction}}
+  howpublished = {\url{https://github.com/jafarov007/beehive-nectar-flow-prediction.git}}
 }
 ```
 
